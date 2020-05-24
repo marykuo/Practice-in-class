@@ -1,0 +1,149 @@
+package ballbouncing;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.util.Random;
+import javax.swing.*;
+/**
+ * The control logic and main display panel for game.
+ */
+public class BallWorld extends JPanel implements ActionListener{
+   private static final int UPDATE_RATE = 30;  // Frames per second (fps)
+   
+   private Ball ball;         // A single bouncing Ball's instance
+   private Ball ball2;
+   private ContainerBox box;  // The container rectangular box
+  
+   private DrawCanvas canvas; // Custom canvas for drawing the box/ball
+   private int canvasWidth;
+   private int canvasHeight;
+  
+   private JButton suspend;
+   private JButton resume;
+   private JPanel bottomPanel;
+   
+   Thread gameThread;
+   private volatile boolean running = true;
+   /**
+    * Constructor to create the UI components and init the game objects.
+    * Set the drawing canvas to fill the screen (given its width and height).
+    * 
+    * @param width : screen width
+    * @param height : screen height
+    */
+   public BallWorld(int width, int height) {
+  
+      canvasWidth = width;
+      canvasHeight = height;
+      
+      // Init the ball at a random location (inside the box) and moveAngle
+      Random rand = new Random();
+      int radius = 100;
+      int x = rand.nextInt(canvasWidth - radius * 2 - 20) + radius + 10;
+      int y = rand.nextInt(canvasHeight - radius * 2 - 20) + radius + 10;
+      int speed = 5;
+      int angleInDegree = rand.nextInt(360);
+      ball = new Ball(x, y, radius, speed, angleInDegree, Color.BLUE);
+      
+      int radius2 = 50;
+      int x2 = rand.nextInt(canvasWidth - radius * 2 - 10) + radius + 10;
+      int y2 = rand.nextInt(canvasHeight - radius * 2 - 10) + radius + 10;
+      int speed2 = 10;
+      int angleInDegree2 = rand.nextInt(360);
+      ball2 = new Ball(x2, y2, radius2, speed2, angleInDegree2, Color.RED);
+      // Init the Container Box to fill the screen
+      box = new ContainerBox(0, 0, canvasWidth, canvasHeight, Color.BLACK, Color.WHITE);
+     
+      // Init the custom drawing panel for drawing the game
+      canvas = new DrawCanvas();
+      this.setLayout(new BorderLayout());
+      this.add(canvas, BorderLayout.CENTER);
+      
+      bottomPanel = new JPanel();
+      suspend = new JButton("Suspend");
+      suspend.addActionListener(this);
+      bottomPanel.add(suspend);
+      resume = new JButton("Resume");
+      resume.addActionListener(this);
+      bottomPanel.add(resume);      
+      this.add(bottomPanel, BorderLayout.SOUTH);
+      
+      // Handling window resize.
+      this.addComponentListener(new ComponentAdapter() {
+         @Override
+         public void componentResized(ComponentEvent e) {
+            Component c = (Component)e.getSource();
+            Dimension dim = c.getSize();
+            canvasWidth = dim.width;
+            canvasHeight = dim.height;
+            // Adjust the bounds of the container to fill the window
+            box.set(0, 0, canvasWidth, canvasHeight);
+         }
+      });
+  
+      // Start the ball bouncing
+      gameStart();
+   }
+   
+   /** Start the ball bouncing. */
+   public void gameStart() {
+      // Run the game logic in its own thread.
+      gameThread = new Thread() {
+         public void run() {
+            while (true) {
+               // Execute one time-step for the game 
+               gameUpdate();
+               // Refresh the display
+               repaint();
+               // Delay and give other thread a chance
+               try {
+                  Thread.sleep(1000 / UPDATE_RATE);
+               } catch (InterruptedException ex) {}
+            }
+         }
+      };
+      gameThread.start();  // Invoke GaemThread.run()
+   }
+   
+   /** 
+    * One game time-step. 
+    * Update the game objects, with proper collision detection and response.
+    */
+   public void gameUpdate() {
+      ball.moveOneStepWithCollisionDetection(box);
+      ball2.moveOneStepWithCollisionDetection(box);
+   }
+   
+   /** The custom drawing panel for the bouncing ball (inner class). */
+   class DrawCanvas extends JPanel {
+      /** Custom drawing codes */
+      @Override
+      public void paintComponent(Graphics g) {
+         super.paintComponent(g);    // Paint background
+         // Draw the box and the ball
+         box.draw(g);
+         ball.draw(g);
+         ball2.draw(g);
+         // Display ball's information
+         g.setColor(Color.WHITE);
+         g.setFont(new Font("Courier New", Font.PLAIN, 12));
+         g.drawString("Ball " + ball.toString(), 20, 30);
+      }
+  
+      /** Called back to get the preferred size of the component. */
+      @Override
+      public Dimension getPreferredSize() {
+         return (new Dimension(canvasWidth, canvasHeight));
+      }
+   }
+
+@Override
+public void actionPerformed(ActionEvent e) {
+	if(e.getSource()==suspend){
+		gameThread.suspend();
+	}else if(e.getSource()==resume){
+		gameThread.resume();
+	}
+	
+}
+}
